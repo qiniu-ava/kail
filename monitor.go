@@ -10,6 +10,7 @@ import (
 	lifecycle "github.com/boz/go-lifecycle"
 	logutil "github.com/boz/go-logutil"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -114,6 +115,8 @@ func (m *_monitor) mainloop(
 
 	sinceSecs := int64(m.config.since / time.Second)
 	since := &sinceSecs
+	var sinceTime *metav1.Time
+	var err error
 
 	m.log.Debugf("displaying logs since %v seconds", sinceSecs)
 
@@ -121,7 +124,7 @@ func (m *_monitor) mainloop(
 
 		m.log.Debugf("readloop count: %v", i)
 
-		err := m.readloop(ctx, client, since)
+		sinceTime, err = m.readloop(ctx, client, since, sinceTime)
 		switch {
 		case err == io.EOF:
 		case err == io.ErrUnexpectedEOF: // retry for disconnection
@@ -134,19 +137,23 @@ func (m *_monitor) mainloop(
 			m.lc.ShutdownAsync(err)
 			return
 		}
-		sinceSecs = 3
+		since = nil // set to nil to use sinceTime instead
 	}
 }
 
 func (m *_monitor) readloop(
-	ctx context.Context, client corev1.CoreV1Interface, since *int64) error {
+	ctx context.Context, client corev1.CoreV1Interface, sinceSeconds *int64, sinceTime *metav1.Time) (lastSuccessTime *metav1.Time, err error) {
 
 	defer m.log.Un(m.log.Trace("readloop"))
 
 	opts := &v1.PodLogOptions{
-		Container:    m.source.Container(),
-		Follow:       true,
-		SinceSeconds: since,
+		Container: m.source.Container(),
+		Follow:    true,
+	}
+	if sinceSeconds != nil {
+		opts.SinceSeconds = sinceSeconds
+	} else if sinceTime != nil {
+		opts.SinceTime = sinceTime
 	}
 
 	req := client.
@@ -156,7 +163,7 @@ func (m *_monitor) readloop(
 
 	stream, err := req.Stream()
 	if err != nil {
-		return err
+		return
 	}
 
 	defer stream.Close()
@@ -165,18 +172,22 @@ func (m *_monitor) readloop(
 	buffer := newBuffer(m.source)
 
 	for ctx.Err() == nil {
-		nread, err := stream.Read(logbuf)
+		nread, e := stream.Read(logbuf)
 
 		switch {
-		case err == io.EOF:
-			return err
+		case e == io.EOF:
+			err = e
+			return
 		case ctx.Err() != nil:
-			return ctx.Err()
-		case err != nil:
+			err = ctx.Err()
+			return
+		case e != nil:
 			m.log.Err(err, "error while reading logs")
-			return io.ErrUnexpectedEOF
+			err = io.ErrUnexpectedEOF
+			return
 		case nread == 0:
-			return io.EOF
+			err = io.EOF
+			return
 		}
 
 		log := logbuf[0:nread]
@@ -190,8 +201,10 @@ func (m *_monitor) readloop(
 			m.deliverEvents(ctx, events)
 		}
 
+		now := metav1.Time{Time: time.Now().Add(time.Second)}
+		lastSuccessTime = &now
 	}
-	return nil
+	return
 }
 
 func (m *_monitor) deliverEvents(ctx context.Context, events []Event) {
