@@ -1,6 +1,6 @@
 
 DOCKER_IMAGE ?= kail
-DOCKER_REPO  ?= abozanich/$(DOCKER_IMAGE)
+DOCKER_REPO  ?= reg-xs.qiniu.io/atlab/$(DOCKER_IMAGE)
 DOCKER_TAG   ?= latest
 
 BUILD_ENV = GOOS=linux GOARCH=amd64

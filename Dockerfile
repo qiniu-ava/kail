@@ -1,6 +1,5 @@
 FROM busybox:glibc
 
-ADD ./kail-linux /kail
+ADD ./kail-linux /usr/bin/kail
 
-ENTRYPOINT ["./kail"]
-CMD [""]
+ENTRYPOINT ["kail"]
