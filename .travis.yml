@@ -9,7 +9,8 @@ services:
   - docker
 
 install:
-  - make install-deps
+  - mkdir ${TRAVIS_HOME}/gopath/src/github.com/boz && mv ${TRAVIS_HOME}/gopath/src/github.com/qiniu-ava/kail ${TRAVIS_HOME}/gopath/src/github.com/boz/kail
+  - cd ${TRAVIS_HOME}/gopath/src/github.com/boz/kail && make install-deps
 
 script: |
   make test-full
