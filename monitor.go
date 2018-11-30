@@ -7,13 +7,12 @@ import (
 	"io"
 	"time"
 
+	lifecycle "github.com/boz/go-lifecycle"
+	logutil "github.com/boz/go-logutil"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-
-	lifecycle "github.com/boz/go-lifecycle"
-	logutil "github.com/boz/go-logutil"
 )
 
 const (
@@ -125,6 +124,7 @@ func (m *_monitor) mainloop(
 		err := m.readloop(ctx, client, since)
 		switch {
 		case err == io.EOF:
+		case err == io.ErrUnexpectedEOF: // retry for disconnection
 		case err == nil:
 		case ctx.Err() != nil:
 			m.lc.ShutdownAsync(nil)
@@ -134,7 +134,7 @@ func (m *_monitor) mainloop(
 			m.lc.ShutdownAsync(err)
 			return
 		}
-		sinceSecs = 1
+		sinceSecs = 3
 	}
 }
 
@@ -173,7 +173,8 @@ func (m *_monitor) readloop(
 		case ctx.Err() != nil:
 			return ctx.Err()
 		case err != nil:
-			return m.log.Err(err, "error while reading logs")
+			m.log.Err(err, "error while reading logs")
+			return io.ErrUnexpectedEOF
 		case nread == 0:
 			return io.EOF
 		}
