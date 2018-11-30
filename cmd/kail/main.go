@@ -17,7 +17,6 @@ import (
 	"github.com/boz/kcache/util"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -173,8 +172,9 @@ func createKubeClient() (kubernetes.Interface, *rest.Config) {
 	cs, rc, err := util.KubeClient(overrides)
 	kingpin.FatalIfError(err, "Error configuring kubernetes connection")
 
-	_, err = cs.CoreV1().Namespaces().List(metav1.ListOptions{})
-	kingpin.FatalIfError(err, "Can't connnect to kubernetes")
+	// skip test due to not allowed permission
+	//_, err = cs.CoreV1().Namespaces().List(metav1.ListOptions{})
+	//kingpin.FatalIfError(err, "Can't connnect to kubernetes")
 
 	return cs, rc
 }
@@ -230,7 +230,13 @@ func createDSBuilder() kail.DSBuilder {
 }
 
 func createDS(ctx context.Context, cs kubernetes.Interface, dsb kail.DSBuilder) kail.DS {
-	ds, err := dsb.Create(ctx, cs)
+	// limited to one ns if provided
+	var ns string
+	if len(*flagNs) > 0 {
+		ns = (*flagNs)[0]
+	}
+
+	ds, err := dsb.Create(ctx, cs, ns)
 	kingpin.FatalIfError(err, "Error creating datasource")
 
 	select {
