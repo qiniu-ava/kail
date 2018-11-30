@@ -1,9 +1,7 @@
 language: go
 
 go:
-  - 1.9
   - "1.10"
-  - tip
 
 sudo: required
 
@@ -14,4 +12,4 @@ install:
   - make install-deps
 
 script: |
-  make test-full && ./release.sh
+  make test-full
