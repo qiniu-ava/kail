@@ -182,7 +182,7 @@ func (m *_monitor) readloop(
 			err = ctx.Err()
 			return
 		case e != nil:
-			m.log.Err(err, "error while reading logs")
+			m.log.Err(e, "error while reading logs")
 			err = io.ErrUnexpectedEOF
 			return
 		case nread == 0:

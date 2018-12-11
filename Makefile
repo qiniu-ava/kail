@@ -1,7 +1,7 @@
 
 DOCKER_IMAGE ?= kail
 DOCKER_REPO  ?= reg-xs.qiniu.io/atlab/$(DOCKER_IMAGE)
-DOCKER_TAG   ?= latest
+DOCKER_TAG   ?= $(shell date -u '+%Y%m%d')-$(shell git rev-parse --short HEAD)
 
 BUILD_ENV = GOOS=linux GOARCH=amd64
 
