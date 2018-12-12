@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+	"time"
 
 	logutil "github.com/boz/go-logutil"
 	logutil_logrus "github.com/boz/go-logutil/logrus"
@@ -64,6 +65,10 @@ var (
 			Default("1s").
 			Duration()
 
+	flagTimeout = kingpin.Flag("timeout", "timeout to quit if there is no log output").
+			PlaceHolder("DURATION").
+			Duration()
+
 	flagGlogV = kingpin.Flag("glog-v", "glog -v value").
 			Default("0").
 			String()
@@ -113,7 +118,7 @@ func main() {
 
 	} else {
 
-		streamLogs(createController(ctx, cs, rc, ds, filter))
+		streamLogs(createController(ctx, cs, rc, ds, filter), *flagTimeout)
 
 	}
 
@@ -274,15 +279,27 @@ func createController(
 	return controller
 }
 
-func streamLogs(controller kail.Controller) {
+func streamLogs(controller kail.Controller, to time.Duration) {
 
 	writer := kail.NewWriter(os.Stdout)
+	var timer *time.Timer
+	if to != time.Duration(0) {
+		timer = time.NewTimer(to)
+	} else {
+		timer = time.NewTimer(time.Minute)
+		timer.Stop()
+	}
 
 	for {
 		select {
 		case ev := <-controller.Events():
 			writer.Print(ev)
+			if to != time.Duration(0) {
+				timer.Reset(to)
+			}
 		case <-controller.Done():
+			return
+		case <-timer.C:
 			return
 		}
 	}
