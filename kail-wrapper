@@ -4,6 +4,7 @@ set -o errexit -o pipefail -o nounset
 
 ! getopt --test > /dev/null
 if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
+    echo "`getopt --test` failed in this environment."
     exit 1
 fi
 
@@ -52,6 +53,7 @@ while true; do
             break
             ;;
         *)
+            echo "arguments error"
             exit 3
             ;;
     esac
@@ -67,9 +69,11 @@ if [ -n "$out" ]; then
         else
             $bin "$@" >> "$out"
         fi
-    elif [ -f "$out" ]; then
+    else
         # backup original file
-        cp "$out" "$out.$(date +%s)"
+        if [ -f "$out" ]; then
+            cp "$out" "$out.$(date +%s)"
+        fi
 
         if [ -n "$stdout" ]; then
             $bin "$@" |tee "$out"
