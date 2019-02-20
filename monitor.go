@@ -9,7 +9,7 @@ import (
 
 	lifecycle "github.com/boz/go-lifecycle"
 	logutil "github.com/boz/go-logutil"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -137,7 +137,6 @@ func (m *_monitor) mainloop(
 			m.lc.ShutdownAsync(err)
 			return
 		}
-		since = nil // set to nil to use sinceTime instead
 	}
 }
 
@@ -150,10 +149,10 @@ func (m *_monitor) readloop(
 		Container: m.source.Container(),
 		Follow:    true,
 	}
-	if sinceSeconds != nil {
-		opts.SinceSeconds = sinceSeconds
-	} else if sinceTime != nil {
+	if sinceTime != nil { // use sinceTime firstly
 		opts.SinceTime = sinceTime
+	} else if sinceSeconds != nil {
+		opts.SinceSeconds = sinceSeconds
 	}
 
 	req := client.
@@ -161,8 +160,10 @@ func (m *_monitor) readloop(
 		GetLogs(m.source.Name(), opts).
 		Context(ctx)
 
-	stream, err := req.Stream()
-	if err != nil {
+	stream, e := req.Stream()
+	if e != nil {
+		m.log.ErrWarn(e, "error while connecting log stream")
+		err = io.ErrUnexpectedEOF
 		return
 	}
 
@@ -182,7 +183,7 @@ func (m *_monitor) readloop(
 			err = ctx.Err()
 			return
 		case e != nil:
-			m.log.Err(e, "error while reading logs")
+			m.log.ErrWarn(e, "error while reading log stream")
 			err = io.ErrUnexpectedEOF
 			return
 		case nread == 0:
