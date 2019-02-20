@@ -163,7 +163,7 @@ func (m *_monitor) readloop(
 	stream, e := req.Stream()
 	if e != nil {
 		m.log.ErrWarn(e, "error while connecting log stream")
-		err = io.EOF
+		err = io.ErrUnexpectedEOF
 		return
 	}
 
